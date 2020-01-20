@@ -482,6 +482,53 @@ process kat_hist {
 
 }
 
+process kat_gcp {
+
+    tag "$name"
+    label 'process_medium'
+    publishDir "${params.outdir}/kat_gcp", mode: 'copy'
+
+    input:
+    tuple val(name), path(reads)
+
+    output:
+    path ("*_kat-gcp.json")
+
+    script:
+    """
+    TMP_FASTQ=${name}.fastq
+    mkfifo "\${TMP_FASTQ}" && zcat ${reads} > "\${TMP_FASTQ}" &
+	sleep 5
+	kat gcp -t ${task.cpus} -o "${name}-gcp" "\${TMP_FASTQ}"
+	rm "\${TMP_FASTQ}"
+    """
+}
+
+process kat_compare_reads1v2 {
+
+    tag "$name"
+    label 'process_medium'
+    publishDir "${params.outdir}/kat_compare_r1v2", mode: 'copy'
+
+    input:
+    tuple val(name), path(reads)
+
+    output:
+    path ("*_kat-hist.json")
+
+    script:
+    """
+	TMP_FASTQ1=$(mktemp -u --suffix "_R1.fastq")
+	TMP_FASTQ2=$(mktemp -u --suffix "_R2.fastq")
+	mkfifo "\${TMP_FASTQ1}" && zcat "${reads[0]}" > "\${TMP_FASTQ1}" &
+	mkfifo "\${TMP_FASTQ2}" && zcat "${reads[1]}" > "\${TMP_FASTQ2}" &
+	sleep 5
+	kat comp -n -H 800000000 -I 80000000 -t "${task.cpus}" -o "${name}-r1vsr2" "\${TMP_FASTQ1}" "\${TMP_FASTQ2}"
+	kat plot spectra-mx -i -o "${name}-r1vsr2-main.mx.spectra-mx.png" "${name}-r1vsr2-main.mx"
+	rm "\${TMP_FASTQ1}" "\${TMP_FASTQ2}"    """
+
+}
+
 process fastp {
 
     tag "$name"
