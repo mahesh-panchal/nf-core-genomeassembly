@@ -176,11 +176,11 @@ ${summary.collect { k,v -> "            <dt>$k</dt><dd><samp>${v ?: '<span style
 workflow {
 
     main:
-    illumina_data_qc
+    quality_check_illumina_data
 
 }
 
-workflow illumina_data_qc {
+workflow quality_check_illumina_data {
 
     get:
     reads
@@ -196,7 +196,7 @@ workflow illumina_data_qc {
 
 }
 
-workflow pacbio_data_qc {
+workflow quality_check_pacbio_data {
 
     get:
     reads
@@ -209,7 +209,7 @@ workflow pacbio_data_qc {
 
 }
 
-workflow ont_data_qc {
+workflow quality_check_ont_data {
 
     get:
     reads
@@ -222,7 +222,7 @@ workflow ont_data_qc {
 
 }
 
-workflow hic_data_qc {
+workflow quality_check_hic_data {
 
     get:
     reads
@@ -234,7 +234,7 @@ workflow hic_data_qc {
 
 }
 
-workflow illumina_data_filter {
+workflow filter_illumina_data {
 
     get:
     reads
@@ -245,6 +245,63 @@ workflow illumina_data_filter {
     subtract_filter
     subsample
     normalize
+
+}
+
+workflow assemble_illumina_data {
+
+    get:
+    reads
+
+    main:
+    spades
+    masurca
+    abyss
+
+}
+
+workflow assemble_pacbio_data {
+
+    get:
+    reads
+
+    main:
+    canu
+    flye
+    redbean
+    peregrin
+    marvel
+
+}
+
+workflow assembly_ont_data {
+
+    get:
+    reads
+
+    main:
+    canu
+    flye
+    redbean
+    peregrin
+    marvel
+
+}
+
+workflow polish_assembly_with_illumina {
+}
+
+workflow polish_assembly_with_pacbio {
+}
+
+workflow polish_assembly_with_ont {
+}
+
+workflow scaffold_assembly_with_hic {
+
+    get:
+    reads
+    assembly
 
 }
 
