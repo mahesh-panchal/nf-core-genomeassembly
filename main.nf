@@ -434,6 +434,32 @@ process fastqc {
     """
 }
 
+process fastq_screen {
+
+    tag "$name"
+    label 'process_medium'
+
+    publishDir "${params.outdir}/fastq_screen", mode: 'copy'
+
+    input:
+    tuple val(name), path(fastq_file)
+
+    output:
+    tuple val(name), path("*_screen.{txt,html}")
+
+    script:
+    """
+    sed -E 's/^(THREADS[[:blank:]]+)[[:digit:]]+/\1${task.cpus}/' \\
+        ${params.fastqscreen_config_file} > fastq_screen.conf
+    if [ ! -e "${params.fastqscreen_databases}" ]; then
+        fastq_screen --get_genomes
+    elif [ "${params.fastqscreen_databases}" != "${fastqscreen_default_databases}" ]; then
+        sed -i 's#${fastqscreen_default_databases}#${params.fastqscreen_databases}#' fastq_screen.conf
+    fi
+    fastq_screen --conf fastq_screen.conf $fastq_file
+    """
+}
+
 process fastp {
 
     tag "$name"
