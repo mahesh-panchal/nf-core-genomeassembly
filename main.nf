@@ -382,6 +382,12 @@ workflow evaluate_assemblies {
 }
 
 /*
+ * TODO: Additional workflows and use-cases:
+ * - Whole genome amplified data
+ * - Trio-binning
+ * /
+
+/*
  * Parse software version numbers
  */
 process get_software_versions {
@@ -428,12 +434,31 @@ process fastqc {
     """
 }
 
+process preseq {
+
+    tag "$name"
+    label 'process_medium'
+
+    publishDir "${params.outdir}/preseq", 'copy'
+
+    input:
+    tuple val(name), path(reads)
+
+    output:
+    path("_preseq.json")
+
+    script:
+    """
+    preseq c_curve -s ${params.preseq_step_size} -o ${input.baseName}.ccurve -H $input
+    """
+}
+
 process fastp {
 
     tag "$name"
     label 'process_medium'
 
-    publishDir "${params.outdir}fastp", mode: 'copy'
+    publishDir "${params.outdir}/fastp", mode: 'copy'
 
     input:
     tuple val(name), path(reads)
