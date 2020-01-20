@@ -423,10 +423,10 @@ process fastqc {
         saveAs: { filename -> filename.indexOf(".zip") > 0 ? "zips/$filename" : "$filename" }
 
     input:
-    set val(name), file(reads) from read_files_fastqc
+    tuple val(name), path(reads)
 
     output:
-    file "*_fastqc.{zip,html}" into fastqc_results
+    path "*_fastqc.{zip,html}"
 
     script:
     """
@@ -438,7 +438,6 @@ process fastq_screen {
 
     tag "$name"
     label 'process_medium'
-
     publishDir "${params.outdir}/fastq_screen", mode: 'copy'
 
     input:
@@ -464,7 +463,6 @@ process kat_hist {
 
     tag "$name"
     label 'process_medium'
-
     publishDir "${params.outdir}/kat_hist", mode: 'copy'
 
     input:
@@ -484,7 +482,6 @@ process fastp {
 
     tag "$name"
     label 'process_medium'
-
     publishDir "${params.outdir}/fastp", mode: 'copy'
 
     input:
@@ -509,7 +506,6 @@ process preseq {
 
     tag "$name"
     label 'process_medium'
-
     publishDir "${params.outdir}/preseq", 'copy'
 
     input:
@@ -524,11 +520,10 @@ process preseq {
     """
 }
 
-process run_quast {
+process quast {
 
 	tag "${assemblies}"
     label 'process_medium'
-
 	publishDir "${params.output_dir}/quast", mode: 'copy'
 
 	input:
@@ -544,9 +539,10 @@ process run_quast {
 
 }
 
-process run_kat_cnspectra {
+process kat_cnspectra {
 
 	tag "KAT copy number spectra: ${assembly}"
+    label 'process_medium'
 	publishDir "${params.output_dir}/kat_cnspectra", mode: 'copy'
 
 	input:
@@ -566,7 +562,7 @@ process run_kat_cnspectra {
 
 }
 
-process run_bwa_index {
+process bwa_index {
 
 	tag "$assembly"
 	label 'process_low'
@@ -589,7 +585,6 @@ process bwa {
 
 	tag "$name"
     label 'process_medium'
-
     publishDir "${params.output_dir}/bwa", mode: 'copy'
 
 	input:
@@ -613,8 +608,6 @@ process bwa {
 process frcbam {
 
 	tag "$alignment"
-	label 'process_low'
-
 	publishDir "${params.output_dir}/frcbam", mode: 'copy'
 
 	input:
@@ -637,8 +630,6 @@ process frc_plot {
      */
 
 	tag "FRC plot: all alignments"
-	label 'process_low'
-
 	publishDir "${params.output_dir}/frcbam", mode: 'copy'
 
 	input:
@@ -666,6 +657,7 @@ process frc_plot {
 process blast {
 
 	tag "$assembly"
+    label 'process_high'
 	publishDir "${params.output_dir}/blast", mode: 'copy'
 
 	input:
@@ -690,8 +682,6 @@ process blast {
 process blobtools {
 
 	tag "$assembly"
-    label 'process_low'
-
     publishDir "${params.output_dir}/blobtools", mode: 'copy'
 
 	input:
@@ -711,25 +701,24 @@ process blobtools {
 process kraken {
 
 	tag "$assembly"
-	label 'process_large'
-
+	label 'process_high'
 	publishDir "${params.output_dir}/kraken_classification", mode: 'copy'
 
 	input:
-    val(input_type)
+    val(sequence_type)
     path(assembly)
 
 	output:
 	path("${assembly.baseName}.kraken_classification.{tsv,rpt,html}")
 
 	script:
-    if(input_type == 'assembly') {
+    if(sequence_type == 'assembly') {
     	"""
     	kraken --threads ${task.cpus} --db ${params.kraken_db} --fasta-input ${assembly} > ${assembly.baseName}.kraken_classification.tsv
     	kraken-report --db ${params.kraken_db} ${assembly.baseName}.kraken_classification.tsv > ${assembly.baseName}.kraken_classification.rpt
     	ktImportTaxonomy <( cut -f2,3 ${assembly.baseName}.kraken.out ) -o ${assembly.baseName}.kraken_classification.html
     	"""
-    } else if (input_type == 'illumina_paired_reads') {
+    } else if (sequence_type == 'illumina_paired_reads') {
     }
 }
 
@@ -739,7 +728,6 @@ process busco {
 
 	tag "${line} -> ${assembly}"
     label 'process_medium'
-
 	publishDir "${params.output_dir}/busco", mode: 'copy'
 
 	input:
@@ -763,16 +751,16 @@ process multiqc {
     publishDir "${params.outdir}/MultiQC", mode: 'copy'
 
     input:
-    file multiqc_config from ch_multiqc_config
+    path multiqc_config from ch_multiqc_config
     // TODO nf-core: Add in log files from your new processes for MultiQC to find!
-    file ('fastqc/*') from fastqc_results.collect().ifEmpty([])
-    file ('software_versions/*') from software_versions_yaml.collect()
-    file workflow_summary from create_workflow_summary(summary)
+    path ('fastqc/*') from fastqc_results.collect().ifEmpty([])
+    path ('software_versions/*') from software_versions_yaml.collect()
+    path workflow_summary from create_workflow_summary(summary)
 
     output:
-    file "*multiqc_report.html" into multiqc_report
-    file "*_data"
-    file "multiqc_plots"
+    path "*multiqc_report.html" into multiqc_report
+    path "*_data"
+    path "multiqc_plots"
 
     script:
     rtitle = custom_runName ? "--title \"$custom_runName\"" : ''
@@ -790,10 +778,10 @@ process output_documentation {
     publishDir "${params.outdir}/pipeline_info", mode: 'copy'
 
     input:
-    file output_docs from ch_output_docs
+    path output_docs from ch_output_docs
 
     output:
-    file "results_description.html"
+    path "results_description.html"
 
     script:
     """
