@@ -229,6 +229,8 @@ workflow quality_check_hic_data {
 
     main:
     fastqc
+    kat_hist
+    kat_gcp
     kraken
     mash_screen
 
@@ -245,6 +247,30 @@ workflow filter_illumina_data {
     subtract_filter
     subsample
     normalize
+
+}
+
+workflow filter_pacbio_data {
+
+    get:
+    reads
+    contaminant_references
+
+    main:
+    subtract_filter
+    subsample
+
+}
+
+workflow filter_ont_data {
+
+    get:
+    reads
+    contaminant_references
+
+    main:
+    subtract_filter
+    subsample
 
 }
 
@@ -271,10 +297,11 @@ workflow assemble_pacbio_data {
     redbean
     peregrin
     marvel
+    miniasm
 
 }
 
-workflow assembly_ont_data {
+workflow assemble_ont_data {
 
     get:
     reads
@@ -285,16 +312,44 @@ workflow assembly_ont_data {
     redbean
     peregrin
     marvel
+    miniasm
 
 }
 
 workflow polish_assembly_with_illumina {
+
+    get:
+    assembly
+    reads
+
+    main:
+    pilon
+    ntEdit
+
 }
 
 workflow polish_assembly_with_pacbio {
+
+    get:
+    assembly
+    reads
+
+    main:
+    racon
+    quiver
+
 }
 
 workflow polish_assembly_with_ont {
+
+    get:
+    assembly
+    reads
+
+    main:
+    medaka
+    nanopolish
+
 }
 
 workflow scaffold_assembly_with_hic {
@@ -302,6 +357,27 @@ workflow scaffold_assembly_with_hic {
     get:
     reads
     assembly
+
+    main:
+    salsa
+}
+
+workflow evaluate_assemblies {
+
+    get:
+    assemblies
+    illumina_reads
+
+    main:
+    quast
+    kat_cn_spectra
+    frcbam
+    busco
+    blast
+    blobtools
+    kraken
+    mash_screen
+    bandage
 
 }
 
