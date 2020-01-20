@@ -361,7 +361,7 @@ workflow scaffold_assembly_with_hic {
     salsa
 }
 
-workflow evaluate_assemblies {
+workflow compare_assemblies {
 
     get:
     assemblies
@@ -377,7 +377,7 @@ workflow evaluate_assemblies {
     blobtools
     kraken
     mash_screen
-    bandage
+    //bandage
 
 }
 
