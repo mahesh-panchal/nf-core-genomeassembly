@@ -398,8 +398,8 @@ process get_software_versions {
         }
 
     output:
-    file 'software_versions_mqc.yaml' into software_versions_yaml
-    file "software_versions.csv"
+    path 'software_versions_mqc.yaml'
+    path "software_versions.csv"
 
     script:
     // TODO nf-core: Get all tools to print their version number here
@@ -469,11 +469,15 @@ process kat_hist {
     tuple val(name), path(reads)
 
     output:
-    path ("*_fastp.json")
+    path ("*_kat-hist.json")
 
     script:
     """
-    kat hist
+    TMP_FASTQ=${name}.fastq
+    mkfifo "\${TMP_FASTQ}" && zcat ${reads} > "\${TMP_FASTQ}" &
+	sleep 5
+	kat hist -t ${task.cpus} -o "${name}-hist" "\${TMP_FASTQ}"
+	rm "\${TMP_FASTQ}"
     """
 
 }
