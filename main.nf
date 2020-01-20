@@ -718,11 +718,54 @@ process bbmap_normalize {
     """
 }
 
+process spades {
+
+    tag "$name"
+    label 'process_high'
+    publishDir "${params.outdir}/spades", mode: 'copy'
+
+    input:
+    tuple val(name), path(reads)
+
+    output:
+    path("assembly")
+
+    script:
+    """
+    R1READS=( *_R1.fastq.gz )
+    R2READS=( *_R2.fastq.gz )
+
+    CONFIG=my_dataset.yaml
+
+    printf -v R1LIST '"%s",\n' "\${R1READS[@]}"
+    printf -v R2LIST '"%s",\n' "\${R2READS[@]}"
+    R1LIST=\${R1LIST%,*}
+    R2LIST=\${R2LIST%,*}
+    cat > \$CONFIG <<-EOF
+      [
+        {
+          orientation: "fr",
+          type: "paired-end",
+          right reads: [
+            \$R1LIST
+          ],
+          left reads: [
+            \$R2LIST
+          ]
+        }
+      ]
+    EOF
+
+    spades.py -k ${params.spades_kmer_size} --careful --dataset "\$CONFIG" -o "${PREFIX}-spades_assembly"
+    """
+}
+
+
 process preseq {
 
     tag "$name"
     label 'process_medium'
-    publishDir "${params.outdir}/preseq", 'copy'
+    publishDir "${params.outdir}/preseq", mode: 'copy'
 
     input:
     tuple val(name), path(alignment)
