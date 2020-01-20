@@ -186,7 +186,6 @@ workflow quality_check_illumina_data {
     reads
 
     main:
-    preseq
     fastqc
     fastqc_screen
     kat_hist
@@ -369,6 +368,7 @@ workflow evaluate_assemblies {
     illumina_reads
 
     main:
+    preseq
     quast
     kat_cn_spectra
     frcbam
@@ -434,25 +434,6 @@ process fastqc {
     """
 }
 
-process preseq {
-
-    tag "$name"
-    label 'process_medium'
-
-    publishDir "${params.outdir}/preseq", 'copy'
-
-    input:
-    tuple val(name), path(reads)
-
-    output:
-    path("_preseq.json")
-
-    script:
-    """
-    preseq c_curve -s ${params.preseq_step_size} -o ${input.baseName}.ccurve -H $input
-    """
-}
-
 process fastp {
 
     tag "$name"
@@ -476,6 +457,25 @@ process fastp {
         --json ${name}_fastp.json
     """
 
+}
+
+process preseq {
+
+    tag "$name"
+    label 'process_medium'
+
+    publishDir "${params.outdir}/preseq", 'copy'
+
+    input:
+    tuple val(name), path(alignment)
+
+    output:
+    path("_preseq.json")
+
+    script:
+    """
+    preseq c_curve -s ${params.preseq_step_size} -o ${alignment.baseName}.ccurve -H $alignment
+    """
 }
 
 /*
