@@ -244,7 +244,7 @@ workflow filter_illumina_data {
     main:
     fastp
     subtract_filter
-    subsample
+    seqtk_subsample
     normalize
 
 }
@@ -620,6 +620,66 @@ process fastp {
         --json ${name}_fastp.json
     """
 
+}
+
+process subtract_filter{
+
+    tag "$name"
+    label 'process_medium'
+    publishDir "${params.outdir}/subtraction_filtered", mode 'copy'
+
+    input:
+    tuple val(name), path(reads)
+    path(contaminant_genomes)
+
+    output:
+    tuple val(name), path(reads)
+
+    script:
+    """
+    subtraction_filter () {
+        local READS="\$1"
+        local REFERENCE="\$2"
+        bwa mem -t ${task.cpus} "\$REFERENCE" "\$READS" | samtools sort -@ ${task.cpus} -O BAM -o ${name}_sub.bam -
+        samtools index ${name}_sub.bam
+        samtools view -@ "${task.cpus}" -F 4 "${name}_sub.bam" | cut -f1 | sort -u -o "${name}_contaminant_aligned_reads.tsv"
+        samtools view -@ "${task.cpus}" "${name}_sub.bam" | cut -f1 | sort -u -o "${name}_all_reads.tsv"
+        # set difference using bash sort: sort \$1 \$2 \$2 | uniq -u # Keep unique entries to set \$1
+        sort --parallel="${task.cpus}" "${name}_all_reads.tsv" "${name}_contaminant_aligned_reads.tsv" "${name}_contaminant_aligned_reads.tsv" | uniq -u > "${name}_uncontaminated_reads.tsv"
+        join -t ' ' <( zcat "\${READS[0]}" | paste - - - - | sort -k1,1 ) <( sed 's/^/@/' "${name}_uncontaminated_reads.tsv" ) | tr '\t' '\n' | pigz -c > "${name}_tmp-subtracted_R1.fastq.gz" &
+        join -t ' ' <( zcat "\${READS[1]}" | paste - - - - | sort -k1,1 ) <( sed 's/^/@/' "${name}_uncontaminated_reads.tsv" ) | tr '\t' '\n' | pigz -c > "${name}_tmp-subtracted_R2.fastq.gz" &
+        wait
+        mv "${name}_tmp-subtracted_R1.fastq.gz" "${name}_subtracted_R1.fastq.gz"
+        mv "${name}_tmp-subtracted_R2.fastq.gz" "${name}_subtracted_R2.fastq.gz"
+        return ( "${name}_subtracted_R1.fastq.gz" "${name}_subtracted_R2.fastq.gz" )
+    }
+
+    SEQUENCES=( $reads )
+    for CONTAMINANT in ${contaminant_genomes}; do
+        READS=subtraction_filter(\$SEQUENCES,\$CONTAMINANT)
+    done
+    """
+
+}
+
+process seqtk_subsample {
+
+    tag "$name"
+    label 'process_low'
+    publishDir "${params.outdir}/seqtk_subsampled", mode 'copy'
+
+    input:
+    tuple val(name), path(reads)
+
+    output:
+    tuple val(name), path("${name}_subsamp_R{1,2}.fastq.gz")
+
+    script:
+    """
+    seqtk sample -s"${params.seqtk_seed}" "${reads[0]}" "${params.seqtk_fraction}" | gzip -c > "${name}_subsamp_R1.fastq.gz" &
+    seqtk sample -s"${params.seqtk_seed}" "${reads[1]}" "${params.seqtk_fraction}" | gzip -c > "${name}_subsamp_R2.fastq.gz"
+    wait
+    """
 }
 
 process preseq {
