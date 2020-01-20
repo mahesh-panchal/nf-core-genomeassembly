@@ -556,7 +556,7 @@ process kraken {
 
 	tag "$name"
 	label 'process_high'
-	publishDir "${params.output_dir}/kraken_classification", mode: 'copy'
+	publishDir "${params.outdir}/kraken_classification", mode: 'copy'
 
 	input:
     val(sequence_type)
@@ -582,7 +582,7 @@ process mash_screen {
 
 	tag "$name"
 	label 'process_medium'
-	publishDir "${params.output_dir}/mash_screen", mode: 'copy'
+	publishDir "${params.outdir}/mash_screen", mode: 'copy'
 
 	input:
     tuple path(name), path(sequences)
@@ -596,6 +596,24 @@ process mash_screen {
     mash screen ${report_all} -p ${task.cpus} ${params.mash_screen_sketch} ${sequences} > ${name}_mash-screen.tsv
     """
 
+}
+
+process nanoplot {
+
+    tag "$name"
+    label 'process_medium'
+    publishDir "${params.outdir}/nanoplot", mode: 'copy'
+
+    input:
+    tuple val(name), path(reads)
+
+    output:
+    path ("output")
+
+    script:
+    """
+    NanoPlot --bam $reads
+    """
 }
 
 process fastp {
