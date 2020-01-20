@@ -245,7 +245,7 @@ workflow filter_illumina_data {
     fastp
     subtract_filter
     seqtk_subsample
-    normalize
+    bbmap_normalize
 
 }
 
@@ -633,7 +633,7 @@ process subtract_filter{
     path(contaminant_genomes)
 
     output:
-    tuple val(name), path(reads)
+    tuple val(name), path("*_subtracted_R{1,2}.fastq.gz")
 
     script:
     """
@@ -679,6 +679,24 @@ process seqtk_subsample {
     seqtk sample -s"${params.seqtk_seed}" "${reads[0]}" "${params.seqtk_fraction}" | gzip -c > "${name}_subsamp_R1.fastq.gz" &
     seqtk sample -s"${params.seqtk_seed}" "${reads[1]}" "${params.seqtk_fraction}" | gzip -c > "${name}_subsamp_R2.fastq.gz"
     wait
+    """
+}
+
+process bbmap_normalize {
+
+    tag "$name"
+    label 'process_medium'
+    publishDir "${params.outdir}/bbmap_normalized", mode: 'copy'
+
+    input:
+    tuple val(name), path(reads)
+
+    output:
+    tuple val(name), path("*_bbmap-norm_R{1,2}.fastq.gz")
+
+    script:
+    """
+    bbnorm.sh t="${task.cpus}" in="${reads[0]}" in2="${reads[1]}" out="${name}_bbmap-norm_R1.fastq.gz" out2="${name}_bbmap-norm_R2.fastq.gz"
     """
 }
 
