@@ -788,10 +788,9 @@ process kraken {
 	script:
     if(sequence_type == 'assembly') {
     	"""
-    	kraken --threads ${task.cpus} --db ${params.kraken_db} --fasta-input ${assembly} > ${assembly.baseName}.kraken_classification.tsv
-    	kraken-report --db ${params.kraken_db} ${assembly.baseName}.kraken_classification.tsv > ${assembly.baseName}.kraken_classification.rpt
-    	ktImportTaxonomy <( cut -f2,3 ${assembly.baseName}.kraken.out ) -o ${assembly.baseName}.kraken_classification.html
-    	"""
+        kraken2 --threads "${task.cpus}" --db "${params.kraken_db}" --report "${assembly.baseName}_kraken.rpt" "${assembly}" > "${assembly.baseName}_kraken.tsv"
+        ktImportTaxonomy <( cut -f2,3 "${assembly.baseName}_kraken.tsv" ) -o "${assembly.baseName}_kraken_krona.html"
+        """
     } else if (sequence_type == 'illumina_paired_reads') {
     }
 }
