@@ -774,25 +774,28 @@ process blobtools {
 
 process kraken {
 
-	tag "$assembly"
+	tag "$name"
 	label 'process_high'
 	publishDir "${params.output_dir}/kraken_classification", mode: 'copy'
 
 	input:
     val(sequence_type)
-    path(assembly)
+    tuple path(name), path(sequences)
 
 	output:
-	path("${assembly.baseName}.kraken_classification.{tsv,rpt,html}")
+	path("${name}.kraken*.{tsv,rpt,html}")
 
 	script:
-    if(sequence_type == 'assembly') {
-    	"""
-        kraken2 --threads "${task.cpus}" --db "${params.kraken_db}" --report "${assembly.baseName}_kraken.rpt" "${assembly}" > "${assembly.baseName}_kraken.tsv"
-        ktImportTaxonomy <( cut -f2,3 "${assembly.baseName}_kraken.tsv" ) -o "${assembly.baseName}_kraken_krona.html"
-        """
-    } else if (sequence_type == 'illumina_paired_reads') {
-    }
+    sequence_opts = ''
+    if (sequence_type == 'illumina_paired_reads') {
+        sequence_opts = '--gzip-compressed --paired'
+    } else if (sequence_type == 'pacbio_reads' || sequence_type == 'ont_reads') {
+        sequence_opts = '--gzip-compressed'
+    } // else if (sequence_type == 'assembly')
+    """
+    kraken2 --threads "${task.cpus}" --db "${params.kraken_db}" --report "${name}_kraken.rpt" ${sequence_opts} ${sequences} > "${name}_kraken.tsv"
+    ktImportTaxonomy <( cut -f2,3 "${name}_kraken.tsv" ) -o "${name}_kraken_krona.html"
+    """
 }
 
 process busco {
@@ -804,7 +807,7 @@ process busco {
 	publishDir "${params.output_dir}/busco", mode: 'copy'
 
 	input:
-		tuple file(lineage), path(assembly)
+		tuple path(lineage), path(assembly)
 
 	output:
 		path ("run_${asm}_busco_${line}")
