@@ -552,6 +552,52 @@ process kat_compare_libs {
     """
 }
 
+process kraken {
+
+	tag "$name"
+	label 'process_high'
+	publishDir "${params.output_dir}/kraken_classification", mode: 'copy'
+
+	input:
+    val(sequence_type)
+    tuple path(name), path(sequences)
+
+	output:
+	path("${name}.kraken*.{tsv,rpt,html}")
+
+	script:
+    sequence_opts = ''
+    if (sequence_type == 'illumina_paired_reads') {
+        sequence_opts = '--gzip-compressed --paired'
+    } else if (sequence_type == 'pacbio_reads' || sequence_type == 'ont_reads') {
+        sequence_opts = '--gzip-compressed'
+    } // else if (sequence_type == 'assembly')
+    """
+    kraken2 --threads "${task.cpus}" --db "${params.kraken_db}" --report "${name}_kraken.rpt" ${sequence_opts} ${sequences} > "${name}_kraken.tsv"
+    ktImportTaxonomy <( cut -f2,3 "${name}_kraken.tsv" ) -o "${name}_kraken_krona.html"
+    """
+}
+
+process mash_screen {
+
+	tag "$name"
+	label 'process_medium'
+	publishDir "${params.output_dir}/mash_screen", mode: 'copy'
+
+	input:
+    tuple path(name), path(sequences)
+
+	output:
+	path("${name}_mash-screen.tsv")
+
+	script:
+    report_all = ${params.mash_screen_report_all} ? '' : '-w'
+    """
+    mash screen ${report_all} -p ${task.cpus} ${params.mash_screen_sketch} ${sequences} > ${name}_mash-screen.tsv
+    """
+
+}
+
 process fastp {
 
     tag "$name"
@@ -770,32 +816,6 @@ process blobtools {
 		-o ${assembly.baseName}_blobtools --names ${params.blobtools_name_db} --nodes ${params.blobtools_node_db}
 	blobtools blobplot -i ${assembly.baseName}_blobtools.blobDB.json -o ${assembly.baseName}_blobtools
 	"""
-}
-
-process kraken {
-
-	tag "$name"
-	label 'process_high'
-	publishDir "${params.output_dir}/kraken_classification", mode: 'copy'
-
-	input:
-    val(sequence_type)
-    tuple path(name), path(sequences)
-
-	output:
-	path("${name}.kraken*.{tsv,rpt,html}")
-
-	script:
-    sequence_opts = ''
-    if (sequence_type == 'illumina_paired_reads') {
-        sequence_opts = '--gzip-compressed --paired'
-    } else if (sequence_type == 'pacbio_reads' || sequence_type == 'ont_reads') {
-        sequence_opts = '--gzip-compressed'
-    } // else if (sequence_type == 'assembly')
-    """
-    kraken2 --threads "${task.cpus}" --db "${params.kraken_db}" --report "${name}_kraken.rpt" ${sequence_opts} ${sequences} > "${name}_kraken.tsv"
-    ktImportTaxonomy <( cut -f2,3 "${name}_kraken.tsv" ) -o "${name}_kraken_krona.html"
-    """
 }
 
 process busco {
