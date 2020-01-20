@@ -514,7 +514,7 @@ process kat_compare_reads1v2 {
     tuple val(name), path(reads)
 
     output:
-    path ("*_kat-hist.json")
+    path ("*_kat-r1vsr2.json")
 
     script:
     """
@@ -525,8 +525,31 @@ process kat_compare_reads1v2 {
 	sleep 5
 	kat comp -n -H 800000000 -I 80000000 -t "${task.cpus}" -o "${name}-r1vsr2" "\${TMP_FASTQ1}" "\${TMP_FASTQ2}"
 	kat plot spectra-mx -i -o "${name}-r1vsr2-main.mx.spectra-mx.png" "${name}-r1vsr2-main.mx"
-	rm "\${TMP_FASTQ1}" "\${TMP_FASTQ2}"    """
+	rm "\${TMP_FASTQ1}" "\${TMP_FASTQ2}"
+    """
+}
 
+process kat_compare_libs {
+    tag "$name_a vs $name_b"
+    label 'process_medium'
+    publishDir "${params.outdir}/kat_compare_libs", mode: 'copy'
+
+    input:
+    tuple val(name_a), path(reads_a), val(name_b), path(reads_b)
+
+    output:
+    path ("*_kat-libs.json")
+
+    script:
+    """
+	TMP_FASTQ1=$(mktemp -u --suffix "_A.fastq")
+	TMP_FASTQ2=$(mktemp -u --suffix "_B.fastq")
+	mkfifo "\${TMP_FASTQ1}" && zcat $reads_a > "\${TMP_FASTQ1}" &
+	mkfifo "\${TMP_FASTQ2}" && zcat $reads_b > "\${TMP_FASTQ2}" &
+	sleep 5
+	kat comp -H 800000000 -I 80000000 -t "${task.cpus}" -o "${name_a}vs${name_b}-comp" "\${TMP_FASTQ1}" "\${TMP_FASTQ2}"
+	rm "\${TMP_FASTQ1}" "\${TMP_FASTQ2}"
+    """
 }
 
 process fastp {
