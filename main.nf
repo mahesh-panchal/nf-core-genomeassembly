@@ -197,6 +197,7 @@ process get_software_versions {
  * STEP 1 - FastQC
  */
 process fastqc {
+
     tag "$name"
     label 'process_medium'
     publishDir "${params.outdir}/fastqc", mode: 'copy',
@@ -212,6 +213,31 @@ process fastqc {
     """
     fastqc --quiet --threads $task.cpus $reads
     """
+}
+
+process fastp {
+
+    tag "$name"
+    label 'process_medium'
+
+    publishDir "${params.outdir}fastp", mode: 'copy'
+
+    input:
+    tuple val(name), path(reads)
+
+    output:
+    tuple val(name), path("*fastp-trimmed_R{1,2}.fastq.gz")
+    path ("*_fastp.json")
+
+    script:
+    """
+    fastp -m -Q -L -w ${task.cpus} -i ${reads[0]} -I ${reads[1]} \\
+        -o ${name}_fastp-trimmed_R1.fastq.gz \\
+        -O ${name}_fastp-trimmed_R2.fastq.gz \\
+        --merged_out ${name}_fastq-merged.fastq.gz \\
+        --json ${name}_fastp.json
+    """
+
 }
 
 /*
