@@ -171,6 +171,84 @@ ${summary.collect { k,v -> "            <dt>$k</dt><dd><samp>${v ?: '<span style
 }
 
 /*
+ * Primary workflow
+ */
+workflow {
+
+    main:
+    illumina_data_qc
+
+}
+
+workflow illumina_data_qc {
+
+    get:
+    reads
+
+    main:
+    preseq
+    fastqc
+    fastqc_screen
+    kat_hist
+    kat_gcp
+    kraken
+    mash_screen
+
+}
+
+workflow pacbio_data_qc {
+
+    get:
+    reads
+
+    main:
+    nanoplot
+    kraken
+    mash_screen
+    ycard //chimeric read detection
+
+}
+
+workflow ont_data_qc {
+
+    get:
+    reads
+
+    main:
+    nanoplot
+    kraken
+    mash_screen
+    yacrd // Chimeric read detection
+
+}
+
+workflow hic_data_qc {
+
+    get:
+    reads
+
+    main:
+    fastqc
+    kraken
+    mash_screen
+
+}
+
+workflow illumina_data_filter {
+
+    get:
+    reads
+    contaminant_references
+
+    main:
+    fastp
+    subtract_filter
+    subsample
+    normalize
+
+}
+
+/*
  * Parse software version numbers
  */
 process get_software_versions {
