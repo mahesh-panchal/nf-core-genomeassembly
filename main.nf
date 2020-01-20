@@ -460,6 +460,26 @@ process fastq_screen {
     """
 }
 
+process kat_hist {
+
+    tag "$name"
+    label 'process_medium'
+
+    publishDir "${params.outdir}/kat_hist", mode: 'copy'
+
+    input:
+    tuple val(name), path(reads)
+
+    output:
+    path ("*_fastp.json")
+
+    script:
+    """
+    kat hist
+    """
+
+}
+
 process fastp {
 
     tag "$name"
@@ -502,6 +522,238 @@ process preseq {
     """
     preseq c_curve -s ${params.preseq_step_size} -o ${alignment.baseName}.ccurve -H $alignment
     """
+}
+
+process run_quast {
+
+	tag "${assemblies}"
+    label 'process_medium'
+
+	publishDir "${params.output_dir}/quast", mode: 'copy'
+
+	input:
+	path( assemblies )
+
+	output:
+	path( 'quast_results' )
+
+	script:
+	"""
+	quast.py -t ${task.cpus} --est-ref-size ${params.estimated_genome_size} ${assemblies}
+	"""
+
+}
+
+process run_kat_cnspectra {
+
+	tag "KAT copy number spectra: ${assembly}"
+	publishDir "${params.output_dir}/kat_cnspectra", mode: 'copy'
+
+	input:
+	path(assembly)
+	tuple val(name), path(reads)
+
+	output:
+	path("${assembly.baseName}vs${name}.cncmp*")
+
+	script:
+	"""
+	mkfifo ${name}.fastq && zcat ${reads} > ${name}.fastq &
+	sleep 5
+	kat comp ${params.kat_comp_options} -t ${task.cpus} -o ${assembly.baseName}vs${name}.cncmp ${assembly} ${name}.fastq
+	# kat_distanalysis.py -o ${assembly.baseName}vs${name}.cncmp.disteval ${assembly.baseName}vs${name}.cncmp-main.mx
+	"""
+
+}
+
+process run_bwa_index {
+
+	tag "$assembly"
+	label 'process_low'
+
+	publishDir "${params.output_dir}/bwa_alignment", mode: 'copy'
+
+	input:
+	path (assembly)
+
+	output:
+    path ("${assembly}.*")
+
+	script:
+	"""
+	bwa index ${assembly}
+	"""
+}
+
+process bwa {
+
+	tag "$name"
+    label 'process_medium'
+
+    publishDir "${params.output_dir}/bwa", mode: 'copy'
+
+	input:
+    tuple val(name), path(reads)
+    path(assembly_indices)
+
+	output:
+    tuple path("${assembly}"), path("${assembly.baseName}.${pair_id}.bwa_alignment.bam")
+	path("${assembly.baseName}.${pair_id}.bwa_alignment.bam.stats")
+
+	script:
+	def prefix = "${assembly.baseName}.bwa-aln"
+    """
+	bwa mem -t ${task.cpus} ${assembly} ${reads} \
+		| samtools sort -@ ${task.cpus} -O BAM -o ${prefix}.bam
+	samtools index ${prefix}.bam
+	samtools flagstat ${prefix}.bam > ${prefix}.bam.stats
+	"""
+}
+
+process frcbam {
+
+	tag "$alignment"
+	label 'process_low'
+
+	publishDir "${params.output_dir}/frcbam", mode: 'copy'
+
+	input:
+    path(alignment)
+
+	output:
+	path("${alignment.baseName}_FRC.txt")
+	//path("${alignment.baseName}*.txt")
+
+	script:
+	"""
+	FRC --pe-sam ${alignment} --genome-size ${params.genome_size} --output ${alignment.baseName}
+	"""
+}
+
+process frc_plot {
+
+    /*
+     TODO: Replace by multiqc ?
+     */
+
+	tag "FRC plot: all alignments"
+	label 'process_low'
+
+	publishDir "${params.output_dir}/frcbam", mode: 'copy'
+
+	input:
+	path(feature_counts)
+
+	output:
+	path('FRC_Curve_all_assemblies.png')
+
+	script:
+	"""
+	gnuplot <<EOF
+	set terminal png size 1800 1200
+	set output 'FRC_Curve_all_assemblies.png'
+	set title "FRC Curve" font ",14"
+	set key right bottom font ",8"
+	set autoscale
+	set ylabel "Approximate Coverage (%)"
+	set xlabel "Feature Threshold"
+	files = "${feature_counts}"
+	plot for [data in files] data using 1:2 with lines title data
+	EOF
+	"""
+}
+
+process blast {
+
+	tag "$assembly"
+	publishDir "${params.output_dir}/blast", mode: 'copy'
+
+	input:
+	path(assembly)
+
+	output:
+	path("${assembly.baseName}.blast_alignment.{tsv,html}")
+    tuple path("${assembly}"), path("${assembly.baseName}.blast_alignment.tsv")
+
+	script:
+	"""
+	set_difference () {
+		sort "\$1" "\$2" "\$2" | uniq -u
+	}
+	blastn -task megablast -query ${assembly} -db ${params.blast_db}/nt -outfmt '6 qseqid staxids bitscore std sscinames sskingdoms stitle' \
+        -culling_limit 5 -num_threads ${task.cpus} -evalue 1e-25 -out ${assembly.baseName}.blast_alignment.tsv
+	ktImportTaxonomy <( cat <( cut -f1,2 ${assembly.baseName}.blast_alignment.tsv | sort -u ) <( set_difference <( grep ">" ${assembly} | cut -c2- ) <(cut -c1 ${assembly.baseName}.blast_alignment.txt ) )) -o ${assembly.baseName}.blast_alignment.html
+	"""
+
+}
+
+process blobtools {
+
+	tag "$assembly"
+    label 'process_low'
+
+    publishDir "${params.output_dir}/blobtools", mode: 'copy'
+
+	input:
+	tuple path(assembly), path(alignment), path(blasthits)
+
+	output:
+	path("${assembly.baseName}_blobtools*")
+
+	script:
+	"""
+	blobtools create -i ${assembly} -b ${alignment} -t ${blasthits} \
+		-o ${assembly.baseName}_blobtools --names ${params.blobtools_name_db} --nodes ${params.blobtools_node_db}
+	blobtools blobplot -i ${assembly.baseName}_blobtools.blobDB.json -o ${assembly.baseName}_blobtools
+	"""
+}
+
+process kraken {
+
+	tag "$assembly"
+	label 'process_large'
+
+	publishDir "${params.output_dir}/kraken_classification", mode: 'copy'
+
+	input:
+    val(input_type)
+    path(assembly)
+
+	output:
+	path("${assembly.baseName}.kraken_classification.{tsv,rpt,html}")
+
+	script:
+    if(input_type == 'assembly') {
+    	"""
+    	kraken --threads ${task.cpus} --db ${params.kraken_db} --fasta-input ${assembly} > ${assembly.baseName}.kraken_classification.tsv
+    	kraken-report --db ${params.kraken_db} ${assembly.baseName}.kraken_classification.tsv > ${assembly.baseName}.kraken_classification.rpt
+    	ktImportTaxonomy <( cut -f2,3 ${assembly.baseName}.kraken.out ) -o ${assembly.baseName}.kraken_classification.html
+    	"""
+    } else if (input_type == 'illumina_paired_reads') {
+    }
+}
+
+process busco {
+
+    /* TODO: Fix Me */
+
+	tag "${line} -> ${assembly}"
+    label 'process_medium'
+
+	publishDir "${params.output_dir}/busco", mode: 'copy'
+
+	input:
+		tuple file(lineage), path(assembly)
+
+	output:
+		path ("run_${asm}_busco_${line}")
+
+	script:
+		def line = lineage.baseName
+		"""
+		source \$BUSCO_SETUP
+		run_BUSCO.py -i ${assembly} -l ${lineage} -c ${task.cpus} -m genome -o ${asm}_busco_${line}
+		"""
 }
 
 /*
