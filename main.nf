@@ -28,7 +28,6 @@ def helpMessage() {
                                     Available: conda, docker, singularity, awsbatch, test and more.
 
     Options:
-      --genome                      Name of iGenomes reference
       --singleEnd                   Specifies that the input is single end reads
 
     References                      If not specified in the configuration file or you wish to overwrite any of the references.
@@ -58,9 +57,9 @@ if (params.help) {
  */
 
 // Check if genome exists in the config file
-if (params.genomes && params.genome && !params.genomes.containsKey(params.genome)) {
-    exit 1, "The provided genome '${params.genome}' is not available in the iGenomes file. Currently the available genomes are ${params.genomes.keySet().join(", ")}"
-}
+// if (params.genomes && params.genome && !params.genomes.containsKey(params.genome)) {
+//     exit 1, "The provided genome '${params.genome}' is not available in the iGenomes file. Currently the available genomes are ${params.genomes.keySet().join(", ")}"
+// }
 
 // TODO nf-core: Add any reference files that are needed
 // Configurable reference genomes
@@ -70,8 +69,8 @@ if (params.genomes && params.genome && !params.genomes.containsKey(params.genome
 //   input:
 //   file fasta from ch_fasta
 //
-params.fasta = params.genome ? params.genomes[ params.genome ].fasta ?: false : false
-if (params.fasta) { ch_fasta = file(params.fasta, checkIfExists: true) }
+// params.fasta = params.genome ? params.genomes[ params.genome ].fasta ?: false : false
+// if (params.fasta) { ch_fasta = file(params.fasta, checkIfExists: true) }
 
 // Has the run name been specified by the user?
 //  this has the bonus effect of catching both -name and --name
@@ -97,25 +96,36 @@ ch_output_docs = file("$baseDir/docs/output.md", checkIfExists: true)
 /*
  * Create a channel for input read files
  */
-if (params.readPaths) {
-    if (params.singleEnd) {
-        Channel
-            .from(params.readPaths)
-            .map { row -> [ row[0], [ file(row[1][0], checkIfExists: true) ] ] }
-            .ifEmpty { exit 1, "params.readPaths was empty - no input files supplied" }
-            .into { read_files_fastqc; read_files_trimming }
-    } else {
-        Channel
-            .from(params.readPaths)
-            .map { row -> [ row[0], [ file(row[1][0], checkIfExists: true), file(row[1][1], checkIfExists: true) ] ] }
-            .ifEmpty { exit 1, "params.readPaths was empty - no input files supplied" }
-            .into { read_files_fastqc; read_files_trimming }
-    }
+// if (params.readPaths) {
+//     if (params.singleEnd) {
+//         Channel
+//             .from(params.readPaths)
+//             .map { row -> [ row[0], [ file(row[1][0], checkIfExists: true) ] ] }
+//             .ifEmpty { exit 1, "params.readPaths was empty - no input files supplied" }
+//             .into { read_files_fastqc; read_files_trimming }
+//     } else {
+//         Channel
+//             .from(params.readPaths)
+//             .map { row -> [ row[0], [ file(row[1][0], checkIfExists: true), file(row[1][1], checkIfExists: true) ] ] }
+//             .ifEmpty { exit 1, "params.readPaths was empty - no input files supplied" }
+//             .into { read_files_fastqc; read_files_trimming }
+//     }
+// } else {
+//     Channel
+//         .fromFilePairs( params.reads, size: params.singleEnd ? 1 : 2 )
+//         .ifEmpty { exit 1, "Cannot find any reads matching: ${params.reads}\nNB: Path needs to be enclosed in quotes!\nIf this is single-end data, please specify --singleEnd on the command line." }
+//         .into { read_files_fastqc; read_files_trimming }
+// }
+if( params.reads =~ /.csv$/ ){
+    // CSV file of input
+} else if ( params.reads =~ /.bam$/ ) {
+    // Assume unaligned pacbio
+} else if ( params.reads =~ /\{1,2\}.fastq.gz$/ ) {
+    // Assume Illumina paired end
+} else if ( params.reads =~ /\*.fastq.gz$/ ) {
+    // Assume Oxford Nanopore reads
 } else {
-    Channel
-        .fromFilePairs( params.reads, size: params.singleEnd ? 1 : 2 )
-        .ifEmpty { exit 1, "Cannot find any reads matching: ${params.reads}\nNB: Path needs to be enclosed in quotes!\nIf this is single-end data, please specify --singleEnd on the command line." }
-        .into { read_files_fastqc; read_files_trimming }
+    exit 1, "Cannot find any read input matching: ${params.reads}\nNB: Path needs to be enclosed in quotes!\n"
 }
 
 // Header log info
@@ -168,6 +178,25 @@ ${summary.collect { k,v -> "            <dt>$k</dt><dd><samp>${v ?: '<span style
     """.stripIndent()
 
    return yaml_file
+}
+
+/*
+ * Helper functions
+ */
+
+def check_sequence_input(csv_input) {
+}
+
+def get_sequence_input_channels(csv_input) {
+
+    return Channel.fromPath(csv_input)
+                .splitCsv(header: ['platform','reads'], skip:1, quote:"'" )
+                .branch {
+                    ipe     : it[0] == 'ipe'     // WGS Illumina paired end library
+                    pac     : it[0] == 'pac'     // WGS Pacific Biosciences library
+                    ont     : it[0] == 'ont'     // WGS Oxford Nanopore technologies library
+                    hic     : it[0] == 'hic'     // Hi-C Illumina paired end library
+                }
 }
 
 /*
