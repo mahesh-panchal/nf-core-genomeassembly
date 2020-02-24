@@ -236,12 +236,12 @@ workflow quality_check_illumina_data {
     reads
 
     main:
-    fastqc
-    fastqc_screen
-    kat_hist
-    kat_gcp
-    kraken
-    mash_screen
+    fastqc(sample,reads)
+    fastqc_screen(sample,reads)
+    kat_hist(sample,reads)
+    kat_gcp(sample,reads)
+    kraken(sample,reads)
+    mash_screen(sample,reads)
 
 }
 
