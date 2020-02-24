@@ -186,18 +186,20 @@ ${summary.collect { k,v -> "            <dt>$k</dt><dd><samp>${v ?: '<span style
  * Helper functions
  */
 
+/*
 def check_sequence_input(csv_input) {
 }
+*/
 
-def get_sequence_input_channels(csv_input) {
+def get_sequence_input(csv_input) {
 
     return Channel.fromPath(csv_input)
         .splitCsv(header: ['sample','platform','reads'], skip:1, quote:"'" )
         .branch {
-            ipe     : it[0] == 'ipe'     // WGS Illumina paired end library
-            pac     : it[0] == 'pac'     // WGS Pacific Biosciences library
-            ont     : it[0] == 'ont'     // WGS Oxford Nanopore technologies library
-            hic     : it[0] == 'hic'     // Hi-C Illumina paired end library
+            ipe     : it[1] == 'ipe'     // WGS Illumina paired end library
+            pac     : it[1] == 'pac'     // WGS Pacific Biosciences library
+            ont     : it[1] == 'ont'     // WGS Oxford Nanopore technologies library
+            hic     : it[1] == 'hic'     // Hi-C Illumina paired end library
         }
 }
 
@@ -207,8 +209,24 @@ def get_sequence_input_channels(csv_input) {
 workflow {
 
     main:
-    check_sequence_input(params.sequences)
-
+    //check_sequence_input(params.sequences)
+    input_ch = get_sequence_input(params.sequences)
+    input_ch.ipe.multiMap { seqs ->
+        sample: seqs[0]
+        reads: seqs[2]
+        } | quality_check_illumina_data
+    input_ch.pac.multiMap { seqs ->
+        sample: seqs[0]
+        reads: seqs[2]
+        } | quality_check_pacbio_data
+    input_ch.ont.multiMap { seqs ->
+        sample: seqs[0]
+        reads: seqs[2]
+        } | quality_check_ont_data
+    input_ch.hic.multiMap { seqs ->
+        sample: seqs[0]
+        reads: seqs[2]
+        } | quality_check_hic_data
 }
 
 workflow quality_check_illumina_data {
@@ -270,162 +288,162 @@ workflow quality_check_hic_data {
 
 }
 
-workflow filter_illumina_data {
-
-    take:
-    sample
-    reads
-    contaminant_references
-
-    main:
-    fastp
-    subtract_filter
-    seqtk_subsample
-    bbmap_normalize
-
-}
-
-workflow filter_pacbio_data {
-
-    take:
-    sample
-    reads
-    contaminant_references
-
-    main:
-    subtract_filter
-    subsample
-
-}
-
-workflow filter_ont_data {
-
-    take:
-    sample
-    reads
-    contaminant_references
-
-    main:
-    subtract_filter
-    subsample
-
-}
-
-workflow assemble_illumina_data {
-
-    take:
-    sample
-    reads
-
-    main:
-    spades
-    masurca
-    abyss
-
-}
-
-workflow assemble_pacbio_data {
-
-    take:
-    sample
-    reads
-
-    main:
-    canu
-    flye
-    redbean
-    peregrin
-    marvel
-    miniasm
-
-}
-
-workflow assemble_ont_data {
-
-    take:
-    sample
-    reads
-
-    main:
-    canu
-    flye
-    redbean
-    peregrin
-    marvel
-    miniasm
-
-}
-
-workflow polish_assembly_with_illumina {
-
-    take:
-    sample
-    assembly
-    reads
-
-    main:
-    pilon
-    ntEdit
-
-}
-
-workflow polish_assembly_with_pacbio {
-
-    take:
-    sample
-    assembly
-    reads
-
-    main:
-    racon
-    quiver
-
-}
-
-workflow polish_assembly_with_ont {
-
-    take:
-    sample
-    assembly
-    reads
-
-    main:
-    medaka
-    nanopolish
-
-}
-
-workflow scaffold_assembly_with_hic {
-
-    take:
-    sample
-    reads
-    assembly
-
-    main:
-    salsa
-}
-
-workflow compare_assemblies {
-
-    take:
-    sample
-    assemblies
-    illumina_reads
-
-    main:
-    preseq
-    quast
-    kat_cn_spectra
-    frcbam
-    busco
-    blast
-    blobtools
-    kraken
-    mash_screen
-    //bandage
-
-}
+// workflow filter_illumina_data {
+//
+//     take:
+//     sample
+//     reads
+//     contaminant_references
+//
+//     main:
+//     fastp
+//     subtract_filter
+//     seqtk_subsample
+//     bbmap_normalize
+//
+// }
+//
+// workflow filter_pacbio_data {
+//
+//     take:
+//     sample
+//     reads
+//     contaminant_references
+//
+//     main:
+//     subtract_filter
+//     subsample
+//
+// }
+//
+// workflow filter_ont_data {
+//
+//     take:
+//     sample
+//     reads
+//     contaminant_references
+//
+//     main:
+//     subtract_filter
+//     subsample
+//
+// }
+//
+// workflow assemble_illumina_data {
+//
+//     take:
+//     sample
+//     reads
+//
+//     main:
+//     spades
+//     masurca
+//     abyss
+//
+// }
+//
+// workflow assemble_pacbio_data {
+//
+//     take:
+//     sample
+//     reads
+//
+//     main:
+//     canu
+//     flye
+//     redbean
+//     peregrin
+//     marvel
+//     miniasm
+//
+// }
+//
+// workflow assemble_ont_data {
+//
+//     take:
+//     sample
+//     reads
+//
+//     main:
+//     canu
+//     flye
+//     redbean
+//     peregrin
+//     marvel
+//     miniasm
+//
+// }
+//
+// workflow polish_assembly_with_illumina {
+//
+//     take:
+//     sample
+//     assembly
+//     reads
+//
+//     main:
+//     pilon
+//     ntEdit
+//
+// }
+//
+// workflow polish_assembly_with_pacbio {
+//
+//     take:
+//     sample
+//     assembly
+//     reads
+//
+//     main:
+//     racon
+//     quiver
+//
+// }
+//
+// workflow polish_assembly_with_ont {
+//
+//     take:
+//     sample
+//     assembly
+//     reads
+//
+//     main:
+//     medaka
+//     nanopolish
+//
+// }
+//
+// workflow scaffold_assembly_with_hic {
+//
+//     take:
+//     sample
+//     reads
+//     assembly
+//
+//     main:
+//     salsa
+// }
+//
+// workflow compare_assemblies {
+//
+//     take:
+//     sample
+//     assemblies
+//     illumina_reads
+//
+//     main:
+//     preseq
+//     quast
+//     kat_cn_spectra
+//     frcbam
+//     busco
+//     blast
+//     blobtools
+//     kraken
+//     mash_screen
+//     //bandage
+//
+// }
 
 /*
  * TODO: Additional workflows and use-cases:
