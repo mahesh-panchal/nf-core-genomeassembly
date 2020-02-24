@@ -11,6 +11,8 @@
 
 nextflow.preview.dsl=2
 
+params.sequences = ''   // A CSV file containing paths and sequence types and sample names.
+
 def helpMessage() {
     // TODO nf-core: Add to this help message with new command line parameters
     log.info nfcoreHeader()
@@ -190,7 +192,7 @@ def check_sequence_input(csv_input) {
 def get_sequence_input_channels(csv_input) {
 
     return Channel.fromPath(csv_input)
-        .splitCsv(header: ['platform','reads'], skip:1, quote:"'" )
+        .splitCsv(header: ['sample','platform','reads'], skip:1, quote:"'" )
         .branch {
             ipe     : it[0] == 'ipe'     // WGS Illumina paired end library
             pac     : it[0] == 'pac'     // WGS Pacific Biosciences library
@@ -205,13 +207,14 @@ def get_sequence_input_channels(csv_input) {
 workflow {
 
     main:
-    quality_check_illumina_data
+    check_sequence_input(params.sequences)
 
 }
 
 workflow quality_check_illumina_data {
 
-    get:
+    take:
+    sample
     reads
 
     main:
@@ -226,7 +229,8 @@ workflow quality_check_illumina_data {
 
 workflow quality_check_pacbio_data {
 
-    get:
+    take:
+    sample
     reads
 
     main:
@@ -239,7 +243,8 @@ workflow quality_check_pacbio_data {
 
 workflow quality_check_ont_data {
 
-    get:
+    take:
+    sample
     reads
 
     main:
@@ -252,7 +257,8 @@ workflow quality_check_ont_data {
 
 workflow quality_check_hic_data {
 
-    get:
+    take:
+    sample
     reads
 
     main:
@@ -266,7 +272,8 @@ workflow quality_check_hic_data {
 
 workflow filter_illumina_data {
 
-    get:
+    take:
+    sample
     reads
     contaminant_references
 
@@ -280,7 +287,8 @@ workflow filter_illumina_data {
 
 workflow filter_pacbio_data {
 
-    get:
+    take:
+    sample
     reads
     contaminant_references
 
@@ -292,7 +300,8 @@ workflow filter_pacbio_data {
 
 workflow filter_ont_data {
 
-    get:
+    take:
+    sample
     reads
     contaminant_references
 
@@ -304,7 +313,8 @@ workflow filter_ont_data {
 
 workflow assemble_illumina_data {
 
-    get:
+    take:
+    sample
     reads
 
     main:
@@ -316,7 +326,8 @@ workflow assemble_illumina_data {
 
 workflow assemble_pacbio_data {
 
-    get:
+    take:
+    sample
     reads
 
     main:
@@ -331,7 +342,8 @@ workflow assemble_pacbio_data {
 
 workflow assemble_ont_data {
 
-    get:
+    take:
+    sample
     reads
 
     main:
@@ -346,7 +358,8 @@ workflow assemble_ont_data {
 
 workflow polish_assembly_with_illumina {
 
-    get:
+    take:
+    sample
     assembly
     reads
 
@@ -358,7 +371,8 @@ workflow polish_assembly_with_illumina {
 
 workflow polish_assembly_with_pacbio {
 
-    get:
+    take:
+    sample
     assembly
     reads
 
@@ -370,7 +384,8 @@ workflow polish_assembly_with_pacbio {
 
 workflow polish_assembly_with_ont {
 
-    get:
+    take:
+    sample
     assembly
     reads
 
@@ -382,7 +397,8 @@ workflow polish_assembly_with_ont {
 
 workflow scaffold_assembly_with_hic {
 
-    get:
+    take:
+    sample
     reads
     assembly
 
@@ -392,7 +408,8 @@ workflow scaffold_assembly_with_hic {
 
 workflow compare_assemblies {
 
-    get:
+    take:
+    sample
     assemblies
     illumina_reads
 
