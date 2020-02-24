@@ -211,19 +211,19 @@ workflow {
     main:
     //check_sequence_input(params.sequences)
     input_ch = get_sequence_input(params.sequences)
-    input_ch.ipe.multiMap { seqs ->
+    input_ch.ipe.groupTuple().multiMap { seqs ->
         sample: seqs[0]
         reads: seqs[2]
         } | quality_check_illumina_data
-    input_ch.pac.multiMap { seqs ->
+    input_ch.pac.groupTuple().multiMap { seqs ->
         sample: seqs[0]
         reads: seqs[2]
         } | quality_check_pacbio_data
-    input_ch.ont.multiMap { seqs ->
+    input_ch.ont.groupTuple().multiMap { seqs ->
         sample: seqs[0]
         reads: seqs[2]
         } | quality_check_ont_data
-    input_ch.hic.multiMap { seqs ->
+    input_ch.hic.groupTuple().multiMap { seqs ->
         sample: seqs[0]
         reads: seqs[2]
         } | quality_check_hic_data
@@ -233,13 +233,13 @@ workflow quality_check_illumina_data {
 
     take:
     sample
-    reads
+    reads     // [[fileA_1.fastq.gz,fileA_2.fastq.gz],[fileA_1.fastq.gz,fileA_2.fastq.gz],...]
 
     main:
     fastqc(sample,reads)
     fastqc_screen(sample,reads)
-    kat_hist(sample,reads)
-    kat_gcp(sample,reads)
+    kat_hist(sample,reads.flatten().collect())
+    kat_gcp(sample,reads.flatten().collect())
     kraken(sample,reads)
     mash_screen(sample,reads)
 
@@ -487,7 +487,8 @@ process fastqc {
         saveAs: { filename -> filename.indexOf(".zip") > 0 ? "zips/$filename" : "$filename" }
 
     input:
-    tuple val(name), path(reads)
+    val(name)
+    path(reads)
 
     output:
     path "*_fastqc.{zip,html}"
@@ -505,7 +506,8 @@ process fastq_screen {
     publishDir "${params.outdir}/fastq_screen", mode: 'copy'
 
     input:
-    tuple val(name), path(fastq_file)
+    val(name)
+    path(fastq_file)
 
     output:
     tuple val(name), path("*_screen.{txt,html}")
@@ -530,7 +532,8 @@ process kat_hist {
     publishDir "${params.outdir}/kat_hist", mode: 'copy'
 
     input:
-    tuple val(name), path(reads)
+    val(name)
+    path(reads)
 
     output:
     path ("*_kat-hist.json")
