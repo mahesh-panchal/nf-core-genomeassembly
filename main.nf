@@ -134,9 +134,9 @@ def summary = [:]
 if (workflow.revision) summary['Pipeline Release'] = workflow.revision
 summary['Run Name']         = custom_runName ?: workflow.runName
 // TODO nf-core: Report custom parameters here
-summary['Reads']            = params.reads
-summary['Fasta Ref']        = params.fasta
-summary['Data Type']        = params.singleEnd ? 'Single-End' : 'Paired-End'
+//summary['Reads']            = params.reads
+//summary['Fasta Ref']        = params.fasta
+//summary['Data Type']        = params.singleEnd ? 'Single-End' : 'Paired-End'
 summary['Max Resources']    = "$params.max_memory memory, $params.max_cpus cpus, $params.max_time time per job"
 if (workflow.containerEngine) summary['Container'] = "$workflow.containerEngine - $workflow.container"
 summary['Output dir']       = params.outdir
@@ -190,13 +190,13 @@ def check_sequence_input(csv_input) {
 def get_sequence_input_channels(csv_input) {
 
     return Channel.fromPath(csv_input)
-                .splitCsv(header: ['platform','reads'], skip:1, quote:"'" )
-                .branch {
-                    ipe     : it[0] == 'ipe'     // WGS Illumina paired end library
-                    pac     : it[0] == 'pac'     // WGS Pacific Biosciences library
-                    ont     : it[0] == 'ont'     // WGS Oxford Nanopore technologies library
-                    hic     : it[0] == 'hic'     // Hi-C Illumina paired end library
-                }
+        .splitCsv(header: ['platform','reads'], skip:1, quote:"'" )
+        .branch {
+            ipe     : it[0] == 'ipe'     // WGS Illumina paired end library
+            pac     : it[0] == 'pac'     // WGS Pacific Biosciences library
+            ont     : it[0] == 'ont'     // WGS Oxford Nanopore technologies library
+            hic     : it[0] == 'hic'     // Hi-C Illumina paired end library
+        }
 }
 
 /*
