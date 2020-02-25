@@ -196,10 +196,10 @@ def get_sequence_input(csv_input) {
     return Channel.fromPath(csv_input)
         .splitCsv(header: ['sample','platform','reads'], skip:1, quote:"'" )
         .branch {
-            ipe     : it[1] == 'ipe'     // WGS Illumina paired end library
-            pac     : it[1] == 'pac'     // WGS Pacific Biosciences library
-            ont     : it[1] == 'ont'     // WGS Oxford Nanopore technologies library
-            hic     : it[1] == 'hic'     // Hi-C Illumina paired end library
+            ipe     : it['platform'] == 'ipe'     // WGS Illumina paired end library
+            pac     : it['platform'] == 'pac'     // WGS Pacific Biosciences library
+            ont     : it['platform'] == 'ont'     // WGS Oxford Nanopore technologies library
+            hic     : it['platform'] == 'hic'     // Hi-C Illumina paired end library
         }
 }
 
@@ -211,45 +211,35 @@ workflow {
     main:
     //check_sequence_input(params.sequences)
     input_ch = get_sequence_input(params.sequences)
-    input_ch.ipe.groupTuple().multiMap { seqs ->
-        sample: seqs[0]
-        reads: seqs[2]
-        } | quality_check_illumina_data
-    input_ch.pac.groupTuple().multiMap { seqs ->
-        sample: seqs[0]
-        reads: seqs[2]
-        } | quality_check_pacbio_data
-    input_ch.ont.groupTuple().multiMap { seqs ->
-        sample: seqs[0]
-        reads: seqs[2]
-        } | quality_check_ont_data
-    input_ch.hic.groupTuple().multiMap { seqs ->
-        sample: seqs[0]
-        reads: seqs[2]
-        } | quality_check_hic_data
+    input_ch.ipe.map{ tuple(it['sample'],file(it['reads'],checkIfExists:true).sort { it.toString() }) }
+        .groupTuple() | quality_check_illumina_data
+    input_ch.pac.map{ tuple(it['sample'],file(it['reads'],checkIfExists:true).sort { it.toString() }) }
+        .groupTuple() | quality_check_pacbio_data
+    input_ch.ont.map{ tuple(it['sample'],file(it['reads'],checkIfExists:true).sort { it.toString() }) }
+        .groupTuple() | quality_check_ont_data
+    input_ch.hic.map{ tuple(it['sample'],file(it['reads'],checkIfExists:true).sort { it.toString() }) }
+        .groupTuple() | quality_check_hic_data
 }
 
 workflow quality_check_illumina_data {
 
     take:
-    sample
-    reads     // [[fileA_1.fastq.gz,fileA_2.fastq.gz],[fileA_1.fastq.gz,fileA_2.fastq.gz],...]
+    sample_reads     // [Sample, [[fileA_1.fastq.gz,fileA_2.fastq.gz],[fileA_1.fastq.gz,fileA_2.fastq.gz],...]]
 
     main:
-    fastqc(sample,reads)
-    fastqc_screen(sample,reads)
-    kat_hist(sample,reads.flatten().collect())
-    kat_gcp(sample,reads.flatten().collect())
-    kraken(sample,reads)
-    mash_screen(sample,reads)
+    fastqc(sample_reads.transpose())
+    fastqc_screen(sample_reads.transpose())
+    kat_hist(sample_reads.map { it -> tuple(it[0],it[1].flatten())})
+    kat_gcp(sample_reads.map { it -> tuple(it[0],it[1].flatten())})
+    kraken(sample_reads.transpose())
+    mash_screen(sample_reads.transpose())
 
 }
 
 workflow quality_check_pacbio_data {
 
     take:
-    sample
-    reads
+    sample_reads     // [Sample, [[fileA_1.fastq.gz,fileA_2.fastq.gz],[fileA_1.fastq.gz,fileA_2.fastq.gz],...]]
 
     main:
     nanoplot
@@ -262,8 +252,7 @@ workflow quality_check_pacbio_data {
 workflow quality_check_ont_data {
 
     take:
-    sample
-    reads
+    sample_reads     // [Sample, [[fileA_1.fastq.gz,fileA_2.fastq.gz],[fileA_1.fastq.gz,fileA_2.fastq.gz],...]]
 
     main:
     nanoplot
@@ -276,8 +265,7 @@ workflow quality_check_ont_data {
 workflow quality_check_hic_data {
 
     take:
-    sample
-    reads
+    sample_reads     // [Sample, [[fileA_1.fastq.gz,fileA_2.fastq.gz],[fileA_1.fastq.gz,fileA_2.fastq.gz],...]]
 
     main:
     fastqc
